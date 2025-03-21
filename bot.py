@@ -1,51 +1,43 @@
-import logging
+import os
+import time
 import requests
-from aiogram import Bot, Dispatcher, types
-from aiogram.utils import executor
+import telebot
 
-BOT_TOKEN = "7910521495:AAGc0-hhaoiS_bC-zPO9XvEDSZvz3MtWa-E"
-OWNER_ID = 6823641974  # Tumhara Telegram ID
-ALLOWED_GROUP = -1002400853476  # Sirf is group me chalega
+# Bot Token from BotFather
+BOT_TOKEN = 7910521495:AAGc0-hhaoiS_bC-zPO9XvEDSZvz3MtWa-E
 
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher(bot)
+# Bot Initialization
+bot = telebot.TeleBot(BOT_TOKEN)
 
-logging.basicConfig(level=logging.INFO)
+# Bot Start Message
+@bot.message_handler(commands=['start'])
+def start(message):
+    bot.reply_to(message, "🔥 Bot is Running 24/7 on Replit!")
 
-@dp.message_handler(commands=["start"])
-async def send_welcome(message: types.Message):
-    await message.reply("THE OWNER IS @KingPaid1\nCHANNEL @freeapilinks bot working channel @FFLIKEGROUP 🌚😎❤️")
-
-@dp.message_handler(lambda msg: msg.text.startswith("/like"))
-async def like_command(message: types.Message):
-    user_id = message.chat.id
-
-    if user_id != ALLOWED_GROUP and user_id != OWNER_ID:
-        return await message.reply("❌ You are not allowed to use this bot in this chat.")
-
+# /like Command for API Request
+@bot.message_handler(commands=['like'])
+def like_user(message):
     try:
-        command_parts = message.text.split()
-        if len(command_parts) < 2:
-            return await message.reply("❌ Please provide a UID. Example: `/like 12345678`")
-
-        uid = command_parts[1]
-        api_url = f"https://king-like-api.vercel.app/like?uid={uid}&server_name=IND"
-        response = requests.get(api_url).json()
+        uid = message.text.split()[1]
+        url = f"https://king-like-api.vercel.app/like?uid={uid}&server_name=IND"
+        response = requests.get(url).json()
 
         if "error" in response:
-            return await message.reply("🚫 GUEST ACCOUNTS BANNED OR TOKENS EXPIRED WAIT TILL OWNER ADDING.....🌚 NEW ACCOUNT")
+            bot.reply_to(message, "❌ GUEST ACCOUNTS BANNED OR TOKENS EXPIRED WAIT TILL OWNER ADDING... 🌚")
+        else:
+            bot.reply_to(message, f"✅ Likes Before: {response['LikesbeforeCommand']}\n"
+                                  f"✅ Likes After: {response['LikesafterCommand']}\n"
+                                  f"👤 Player: {response['PlayerNickname']}\n"
+                                  f"🆔 UID: {response['UID']}")
+    except:
+        bot.reply_to(message, "❌ Usage: /like <uid>")
 
-        reply_text = (
-            f"✅ Likes Given: {response['LikesGivenByAPI']}\n"
-            f"👍 Likes Before: {response['LikesbeforeCommand']}\n"
-            f"🔥 Likes After: {response['LikesafterCommand']}\n"
-            f"🎮 Player: {response['PlayerNickname']}\n"
-            f"🆔 UID: {response['UID']}"
-        )
-        await message.reply(reply_text)
+# Keep Alive Loop
+def keep_alive():
+    while True:
+        try:
+            bot.polling(none_stop=True)
+        except:
+            time.sleep(3)  # Restart after 3 sec
 
-    except Exception as e:
-        await message.reply(f"❌ Error: {str(e)}")
-
-if __name__ == "__main__":
-    executor.start_polling(dp, skip_updates=True)
+keep_alive()
