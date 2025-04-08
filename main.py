@@ -11,7 +11,7 @@ FIREBASE_URL = "https://memory-d65f1-default-rtdb.firebaseio.com"
 
 bot = TeleBot(TOKEN)
 app = Flask(__name__)
-@app.route('/', methods=["GET", "POST"])
+@app.route('/', methods=["GET","POST"])
 def webhook():
     if request.method == "POST":
     return handler(request)
