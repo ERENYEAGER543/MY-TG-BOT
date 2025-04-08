@@ -98,8 +98,3 @@ def like(message):
         bot.reply_to(message, "Oops! Something went wrong.")
 
 # === Webhook Handler for Vercel ===
-@app.route('/', methods=["GET", "POST"])
-def webhook_root():
-    if request.method == "POST":
-        return handler(request)
-    return "Erehh’s bot is alive and kicking with Mikasa’s rage.", 200
