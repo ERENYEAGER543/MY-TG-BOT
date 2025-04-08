@@ -1,52 +1,68 @@
 import requests
 import time
+from flask import Request, jsonify
 from telebot import TeleBot, types
+from telebot.types import Update
 
-TOKEN = "7910521495:AAGc0-hhaoiS_bC-zPO9XvEDSZvz3MtWa-E"
+# === CONFIGURATION ===
+TOKEN = "YOUR_BOT_TOKEN"  # Replace manually
 OWNER_ID = 6823641974
+FIREBASE_URL = "https://memory-d65f1-default-rtdb.firebaseio.com"
 
 bot = TeleBot(TOKEN)
-allowed_groups = set()
-user_cooldowns = {}
 
-# Send startup message when bot is started
+# === Firebase Functions ===
+def set_data(path, data):
+    requests.put(f"{FIREBASE_URL}/{path}.json", json=data)
+
+def get_data(path):
+    res = requests.get(f"{FIREBASE_URL}/{path}.json")
+    return res.json()
+
+# === Command: /start ===
 @bot.message_handler(commands=['start'])
-def send_welcome(message):
-    if message.chat.type == "private":
-        bot.send_message(message.chat.id,
-            "Hey! This is the **Like Bot** made by @KingPaid1\n\n"
-            "Use `/like <server_name> <uid>` to send likes.\n"
-            "Note: You can only use it once every 24 hours if successful.\n"
-            "If it fails, you can try again!\n\n"
-            "if you want to this bot in your group 😉 contact @DcOwnersBot 🙏.",
-            parse_mode='Markdown')
+def start(message):
+    bot.reply_to(message,
+        "Yo! I'm a Like Bot made by @KingPaid1\n\n"
+        "Commands:\n"
+        "/like <server_name> <uid>\n"
+        "/allow (owner only)"
+    )
 
-# Command for the owner to allow group usage
+# === Command: /allow ===
 @bot.message_handler(commands=['allow'])
-def allow_group(message):
+def allow(message):
     if message.from_user.id != OWNER_ID:
-        bot.reply_to(message, "Only the bot owner can use this command.")
+        bot.reply_to(message, "Only my master can use this.")
         return
-    if message.chat.type in ["group", "supergroup"]:
-        allowed_groups.add(message.chat.id)
-        bot.reply_to(message, "Bot is now allowed to work in this group.")
-    else:
-        bot.reply_to(message, "This command can only be used in groups.")
+    if not message.chat.type.endswith("group"):
+        bot.reply_to(message, "Use this only in groups.")
+        return
+    set_data(f"allowed_groups/{message.chat.id}", {"allowed": True})
+    bot.reply_to(message, "This group is now blessed by the bot gods!")
 
-# Like command
+# === Command: /like ===
 @bot.message_handler(commands=['like'])
 def like(message):
-    if message.chat.type in ["group", "supergroup"] and message.chat.id not in allowed_groups:
-        bot.reply_to(message, "Bot is not allowed to work in this group. Ask the owner to use /allow.")
+    chat_id = str(message.chat.id)
+    user_id = str(message.from_user.id)
+
+    # Check if group is allowed
+    group_data = get_data(f"allowed_groups/{chat_id}")
+    if not group_data or not group_data.get("allowed"):
+        bot.reply_to(message, "This group is not allowed. Ask the owner to use /allow.")
         return
 
-    user_id = message.from_user.id
-    now = time.time()
-
-    # check cooldown
-    if user_id in user_cooldowns and now - user_cooldowns[user_id]["timestamp"] < 86400 and user_cooldowns[user_id]["status"] == "success":
-        bot.reply_to(message, "You can only use this command once every 24 hours after a successful request.")
-        return
+    # Check cooldown
+    cooldown = get_data(f"cooldowns/{user_id}")
+    if cooldown:
+        last = cooldown.get("last_used", 0)
+        if time.time() - last < 86400:
+            remaining = int(86400 - (time.time() - last))
+            hrs = remaining // 3600
+            mins = (remaining % 3600) // 60
+            bot.reply_to(message, f"Chill! Try again in {hrs}h {mins}m.")
+            return
 
     try:
         args = message.text.split()
@@ -55,28 +71,32 @@ def like(message):
             return
 
         server_name, uid = args[1], args[2]
-        api_url = f"https://king-like-api-two.vercel.app/like?server_name={server_name}&uid={uid}"
-        
-        response = requests.get(api_url).json()
+        api_url = f"https://uditanshu-like-api.vercel.app/like?server_name={server_name}&uid={uid}"
+        res = requests.get(api_url).json()
 
-        if "error" in response and response["error"] == "Failed to retrieve initial player info.":
-            bot.reply_to(message, "Accounts are banned or token expired, wait till owners exchange🌚")
-            user_cooldowns[user_id] = {"timestamp": now, "status": "fail"}
-        elif "status" in response and response["status"] == 1:
-            bot.reply_to(message, 
-                f"✅ Likes Sent Successfully!\n\n"
-                f"👤 Player: {response['PlayerNickname']}\n"
-                f"🆔 UID: {response['UID']}\n"
-                f"👍 Before: {response['LikesbeforeCommand']}\n"
-                f"✅ Given: {response['LikesGivenByAPI']}\n"
-                f"🎯 After: {response['LikesafterCommand']}"
+        if res.get("error") == "Failed to retrieve initial player info.":
+            bot.reply_to(message, "Accounts are banned or expired. Wait for reset🌚")
+        elif res.get("status") == 1:
+            set_data(f"cooldowns/{user_id}", {"last_used": time.time()})
+            bot.reply_to(message,
+                f"✅ Likes Sent!\n\n"
+                f"👤 Player: {res['PlayerNickname']}\n"
+                f"🆔 UID: {res['UID']}\n"
+                f"👍 Before: {res['LikesbeforeCommand']}\n"
+                f"✅ Given: {res['LikesGivenByAPI']}\n"
+                f"🎯 After: {res['LikesafterCommand']}"
             )
-            user_cooldowns[user_id] = {"timestamp": now, "status": "success"}
         else:
-            bot.reply_to(message, "An unexpected error occurred, please try again later.")
-            user_cooldowns[user_id] = {"timestamp": now, "status": "fail"}
+            bot.reply_to(message, "Something unexpected happened. Try again later.")
     except Exception as e:
-        bot.reply_to(message, "An error occurred while processing your request.")
-        print(f"Error: {e}")
+        print("Error:", e)
+        bot.reply_to(message, "Oops! Something went wrong.")
 
-bot.polling()
+# === Webhook Handler for Vercel ===
+def handler(request: Request):
+    if request.method == "POST":
+        json_data = request.get_json()
+        update = Update.de_json(json_data)
+        bot.process_new_updates([update])
+        return jsonify({"ok": True})
+    return "This is the bot webhook!", 200
