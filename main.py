@@ -11,7 +11,11 @@ FIREBASE_URL = "https://memory-d65f1-default-rtdb.firebaseio.com"
 
 bot = TeleBot(TOKEN)
 app = Flask(__name__)
-
+@app.route('/', methods=["GET", "POST"])
+def webhook_root():
+    if request.method == "POST":
+        return handler(request)
+    return "Erehh’s bot is alive and kicking with Mikasa’s rage.", 200
 # === Firebase Functions ===
 def set_data(path, data):
     requests.put(f"{FIREBASE_URL}/{path}.json", json=data)
