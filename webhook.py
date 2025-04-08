@@ -5,7 +5,7 @@ from telebot import TeleBot, types
 from telebot.types import Update
 
 # === CONFIGURATION ===
-TOKEN = "YOUR_BOT_TOKEN"  # Replace manually
+TOKEN = "7910521495:AAGc0-hhaoiS_bC-zPO9XvEDSZvz3MtWa-E"  # Replace manually
 OWNER_ID = 6823641974
 FIREBASE_URL = "https://memory-d65f1-default-rtdb.firebaseio.com"
 
