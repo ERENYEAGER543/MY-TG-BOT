@@ -3,14 +3,18 @@ import time
 from flask import Request, jsonify
 from telebot import TeleBot, types
 from telebot.types import Update
-
+from flask import Flask
 # === CONFIGURATION ===
 TOKEN = "7910521495:AAGc0-hhaoiS_bC-zPO9XvEDSZvz3MtWa-E"  # Replace manually
 OWNER_ID = 6823641974
 FIREBASE_URL = "https://memory-d65f1-default-rtdb.firebaseio.com"
 
 bot = TeleBot(TOKEN)
+app = Flask(__name__)
 
+@app.route('/')
+def home():
+    return "Erehh’s bot is alive and kicking with Mikasa’s rage.", 200
 # === Firebase Functions ===
 def set_data(path, data):
     requests.put(f"{FIREBASE_URL}/{path}.json", json=data)
@@ -93,10 +97,6 @@ def like(message):
         bot.reply_to(message, "Oops! Something went wrong.")
 
 # === Webhook Handler for Vercel ===
-def handler(request: Request):
-    if request.method == "POST":
-        json_data = request.get_json()
-        update = Update.de_json(json_data)
-        bot.process_new_updates([update])
-        return jsonify({"ok": True})
-    return "This is the bot webhook!", 200
+@app.route(f"/{TOKEN}", methods=["POST"])
+def webhook():
+    return handler(request)
